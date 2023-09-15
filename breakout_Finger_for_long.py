@@ -125,7 +125,7 @@ def bull_cup(df, ph, index, bo_len, mintest, hgst_value, chw_value):
             if xx > mintest and open <= bomax:
                 for x in range(xx):
                     ph_x = ph_only_values.iloc[x]
-                    if ph_x <= bomax and ph_x >= round(bomax - chw_value, 3):
+                    if ph_x <= bomax and ph_x >= bomax - chw_value:
                         num += 1
                 if num < mintest or hgst_value >= bomax:
                     bomax = None
