@@ -1,7 +1,6 @@
 import pandas as pd
 import pytz
 import os
-import timeit  # для замера времени выполнения кода
 
 
 csv_input_path = "C:/Users/lexx-/my_it_project/Breakout_Finder/project/data/SOLUSDT-1m-2023-11-17.csv"
@@ -380,6 +379,33 @@ class DCAorderCalc:  # расчитывает значения для DCA орд
         # tp_percentage = (bo_price / tp_price - 1) * 100  # изменение от БО в %
 
 
+class CalcMultiposPrices:
+    def __init__(
+        self,
+        multipos_bo_price,
+        step_multiposition,
+        modules_quantity,
+        long_or_short,
+        multiplier=1.0,
+    ):
+        self.prices = [multipos_bo_price]
+        step = multipos_bo_price * step_multiposition / 100
+        for i in range(1, modules_quantity):
+            if long_or_short == "long":
+                price = self.prices[-1] - step
+            elif long_or_short == "short":
+                price = self.prices[-1] + step
+            else:
+                raise ValueError(
+                    f"Invalid value for long_or_short: {long_or_short}. Expected 'long' or 'short'."
+                )
+            self.prices.append(price)
+            step *= multiplier
+
+    def get_prices(self):
+        return self.prices
+
+
 class DCAandTPplaceCalc:  # расчитывает место размещения DCA ордеров и TP
     def __init__(
         self,
@@ -404,7 +430,7 @@ class DCAandTPplaceCalc:  # расчитывает место размещени
 
     def calculate(self, index):
         # вычисления для long
-        if pd.notna(self.df["long_sig"].iloc[index]):
+        if pd.notna(self.df["long_sig"].iloc[index]):  # <<<input signal
             bo_price = self.df["open"].iloc[index + 1]
             self.dca_calc_list_long = DCAorderCalc(
                 bo_price,
@@ -495,6 +521,86 @@ class DCAandTPplaceCalc:  # расчитывает место размещени
             self.calculate(index)
 
 
+# будем писать отдельный класс для расчета TP и DCA long ордеров
+
+
+class DCAandTPplaceCalcLong:  # расчитывает место размещения DCA ордеров и TP
+    def __init__(
+        self,
+        df,
+        bo_size,
+        dca_order_size,
+        dca_step,
+        tp,
+        dca_quantity,
+    ):
+        self.df = df
+        self.bo_size = bo_size
+        self.dca_order_size = dca_order_size
+        self.dca_step = dca_step
+        self.tp = tp
+        self.dca_quantity = dca_quantity
+        # self.short_sig_id = 0
+        self.dca_calc_list_long = []
+        # self.dca_calc_list_short = []
+        self.multipos_bo_price = None  # начальная цена для мультипозиционности
+        # self.main_loop()
+        self.multi_price = 0.0
+        self.candle_df = df[["open_time", "low", "high"]]
+
+    def calculate(self, index):
+        bo_price = self.df.at[index, "open"]
+        if self.multipos_bo_price is None:
+            self.multipos_bo_price = bo_price
+        self.dca_calc_list_long = DCAorderCalc(
+            bo_price,
+            self.bo_size,
+            self.dca_order_size,
+            self.dca_step,
+            self.tp,
+            self.dca_quantity,
+            "long",
+        ).results_long
+        len_dca_calc_list = len(self.dca_calc_list_long)
+        # open_time = self.df["open_time"].iloc[index]
+        candle_df = self.candle_df.loc[index:]  # Создаем новый DataFrame для удобства
+        tp_lost = 0.0
+        remaining_calc = 0
+        ord_price = 0.0
+
+        for row in candle_df.itertuples():  # прогон до конца графика
+            # прогоняем по свечке каждое значение из списка
+            for calc_num in range(remaining_calc, len_dca_calc_list):
+                ord_price = self.dca_calc_list_long[calc_num]["order_price"]
+
+                if (
+                    row.low < ord_price < row.high
+                ):  # <<<<<<<<< - можно добавить обрезку по краям свечи для более правдоподобного поведения
+                    # open_time = self.df["open_time"].iloc[index + 1 + cand_num]
+
+                    print(
+                        f"Order {calc_num} fits in candle time {int(row.open_time)}; Order {ord_price}, Candle {row.low, row.high}"
+                    )
+                    remaining_calc += 1
+                    tp_lost = self.dca_calc_list_long[calc_num]["tp_price"]
+
+            # отрабатываем ТП
+            if (
+                row.low < tp_lost < row.high
+                and tp_lost
+                > 0  # можно добавить фильтр по направлению свечи (например, если последний размещённый ордер был в той же свече что и ТП, и свеча лонг то ОК)
+            ):  # вычисление положения TP
+                print(
+                    f"TP №{remaining_calc - 1} fits in candle time {int(row.open_time)}; TP {tp_lost}, Candle {row.low, row.high}"
+                )
+                self.tp_times = row.open_time  # список для времени срабатывания TP
+                break
+
+    # def main_loop(self):
+    #     for index in range(len(self.df)):
+    #         self.calculate(index)
+
+
 # <------------------------------------------------------------------------------------------------------------------------------->
 # Пример использования:
 # bo_price = 0.8797  # начальная цена
@@ -503,6 +609,10 @@ dca_order_size = 150  # размер СО
 so_step = 0.01  # шаг DCA в% (0.02 = 2%)
 tp = 0.03  # желаемая доходность в %(0.01 = 1%)
 dca_quantity = 6  # количество DCA ордеров (без начального ордера)
+modules_quantity = 4  # количество модулей (экземпляров DCATPplaceCalcLong) которые смогут активироваться
+step_multiposition = 1  # шаг между модулями в % (1 = 1%)
+long_or_short = "long"  # направление сигнала
+multiplier_step_multiposition = 1.0  # множитель шага между модулями
 
 
 def run():
@@ -518,4 +628,80 @@ def run():
 
 # print(timeit.timeit(run, number=30))
 
-run()
+# run()
+
+
+def run_long():
+    # читаем данные из файла
+    bigdata = CSVHandler(csv_input_path, time_convert=False)
+    # обрабатываем (меняем) данные в датафрейме
+    bf = BreakoutFinder(bigdata.df, mode="long")
+    # создаём экземпляр класса для расчёта места размещения DCA ордеров и TP
+    dca_long_instance = DCAandTPplaceCalcLong(
+        bigdata.df,
+        bo_size,
+        dca_order_size,
+        so_step,
+        tp,
+        dca_quantity,
+    )
+
+    sig_quantity = -1  # счётчик сигналов
+    multipos_bo_price = []  # список начальных цен для мультипозиционности
+    multipos_self_quantity = modules_quantity  # счётчик модулей (экземпляров DCATPplaceCalcLong) которые смогут активироваться
+    prices = None
+    tp_times = []  # Будем собирать время срабатывания TP
+
+    for ind, row in enumerate(
+        bigdata.df[:-1].itertuples()
+    ):  # перебираем весь датафрейм (кроме последней строки)
+        # увеличиваем индекс на 1 ибо сигнал срабатывает на открытии следующей свечи
+        indnext = ind + 1
+        next_row = bigdata.df.iloc[indnext]
+        # создание флага для закрытия мультипозиций если нет текущих открытых модулей
+        if not (len(tp_times) == 0 or next_row.open_time <= max(tp_times)):
+            break
+        # если модули закончились, то заканчиваем (по сути обрабатываем только один сигнал на срабатывание)
+        if multipos_self_quantity == 0:  # <<<<<<дописать условие проверки по времени
+            break
+
+        if pd.notna(row.long_sig):  # если видим сигнал
+            sig_quantity += 1
+            multipos_bo_price.append(next_row.open)
+            # вычисляем цены для мультипозиционности
+            calc = CalcMultiposPrices(
+                multipos_bo_price[-1],
+                step_multiposition,
+                modules_quantity,
+                long_or_short,
+                multiplier_step_multiposition,
+            )
+            prices = calc.get_prices()
+            print(f"\n \n multipos_bo_price {prices}")
+
+            print(
+                f"\n сигнал №{sig_quantity} на {next_row.open_time} цена {multipos_bo_price[-1]}"
+            )
+        if prices is not None:
+            start_index = len(prices) - multipos_self_quantity
+            for price in prices[start_index:]:
+                if next_row.low < price < next_row.high:
+                    multipos_self_quantity -= 1
+                    print(
+                        f"<<<<<<<<<<<<<Multiorder #{start_index} activity! Price {price}. Time {next_row.open_time}>>>>>>>>>>>>>>>"
+                    )
+                    dca_long_instance.calculate(indnext)
+                    # получаем время срабатывания TP
+                    tp_times.append(dca_long_instance.tp_times)
+                if multipos_self_quantity == 0:
+                    print(
+                        f"----------------End of multipositions signal #{sig_quantity}--------------------"
+                    )
+                    break
+
+
+run_long()
+
+# calc = CalcMultiposPrices(100, 1, 5, "short", 1)
+# prices = calc.get_prices()
+# print(prices)
