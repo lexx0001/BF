@@ -8,7 +8,7 @@ import config
 # csv_output_path = "C:/Users/lexx-/my_it_project/Breakout_Finder/project/data/SOLUSDT-1m-2023-11-17_rem.csv"
 
 
-class BreakoutFinder:  # индикатор "Бычий/Медвежий кубок" - создание сизналов long и short
+class BreakoutFinder:  # индикатор "Бычий/Медвежий кубок" - создание сигналов long и short
     def __init__(
         self,
         df,
@@ -256,7 +256,7 @@ class CSVHandler:  # работа по обработке csv файлов, из
         self.df.to_csv(csv_path, index=False)
 
 
-class DCAorderCalc:  # расчитывает значения для DCA ордеров и данные для анализа
+class DCAorderCalc:  # рассчитывает значения для DCA ордеров и данные для анализа
     def __init__(
         self,
         bo_price,
@@ -378,7 +378,7 @@ class DCAorderCalc:  # расчитывает значения для DCA орд
         # tp_percentage = (bo_price / tp_price - 1) * 100  # изменение от БО в %
 
 
-class CalcMultiposPrices:  # расчитывает цены для модулей мультипозиционности
+class CalcMultiposPrices:  # рассчитывает начальные цены для модулей мультипозиционности
     def __init__(
         self,
         multipos_bo_price,
@@ -405,7 +405,7 @@ class CalcMultiposPrices:  # расчитывает цены для модуле
         return self.prices
 
 
-class DCAandTPplaceCalc:  # расчитывает место размещения DCA ордеров и TP
+class DCAandTPplaceCalc:  # рассчитывает место размещения DCA ордеров и TP
     def __init__(
         self,
         df,
@@ -491,7 +491,7 @@ def run():
     )
 
 
-class MultiposPrice:
+class MultiposRunnings:  # отслеживает работу и запуск модулей мультипозиционности
     def __init__(
         self,
         dca_long_instance,
@@ -544,7 +544,7 @@ class MultiposPrice:
                     break
 
 
-def run_main(
+def run_main(  # функция для запуска приложения
     long_or_short,
     step_multiposition,
     multiplier_step_multiposition,
@@ -568,7 +568,7 @@ def run_main(
         config.tp,
         config.dca_quantity,
     )
-    multipos_price = MultiposPrice(
+    multipos_price = MultiposRunnings(
         dca_long_instance, step_multiposition, multiplier_step_multiposition
     )
     # перебираем весь датафрейм (кроме последней строки)
