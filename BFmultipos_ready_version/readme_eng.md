@@ -43,7 +43,7 @@ Libraries:
 [Example code or script demonstrating the basic usage of your application.]
 
 ## License
-[Specify the license applicable to your code]
+[Specify the license applicable to your code.]
 
 ## Author
 Alexey Novikov

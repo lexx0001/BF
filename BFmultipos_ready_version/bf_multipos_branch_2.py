@@ -607,4 +607,3 @@ run_main(
     config.init_sig_short_id,
 )
 # run()
-# print("Done!")
